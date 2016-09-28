@@ -86,12 +86,3 @@ class DebugTransportModuleJtag(reqSize : Int, respSize : Int)(implicit val p: Pa
   }
 
 }
-
-class AsyncMailbox extends BlackBox {
-
-  // This Verilog module is parameterized, but until this is supported by Chisel,
-  // this mailbox just has a fixed width of 64 bits, which is enough
-  // for our specific purpose here.
-
-  val io = new CrossingIO(UInt(width=64))
-}

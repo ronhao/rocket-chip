@@ -501,14 +501,20 @@ class NastiRecursiveInterconnect(val nMasters: Int, addrMap: AddrMap)
 
 object AsyncNastiCrossing {
   // takes from_source from the 'from' clock domain to the 'to' clock domain
-  def apply(from_clock: Clock, from_reset: Bool, from_source: NastiIO, to_clock: Clock, to_reset: Bool, depth: Int = 8, sync: Int = 3) = {
+  def apply(from_clock: Clock, from_reset: Bool, from_source: NastiIO,
+    to_clock: Clock, to_reset: Bool, depth: Int = 8, sync: Int = 3) = {
     val to_sink = Wire(new NastiIO()(from_source.p))
 
-    to_sink.aw <> AsyncDecoupledCrossing(from_clock, from_reset, from_source.aw, to_clock, to_reset, depth, sync)
-    to_sink.ar <> AsyncDecoupledCrossing(from_clock, from_reset, from_source.ar, to_clock, to_reset, depth, sync)
-    to_sink.w  <> AsyncDecoupledCrossing(from_clock, from_reset, from_source.w,  to_clock, to_reset, depth, sync)
-    from_source.b <> AsyncDecoupledCrossing(to_clock, to_reset, to_sink.b, from_clock, from_reset, depth, sync)
-    from_source.r <> AsyncDecoupledCrossing(to_clock, to_reset, to_sink.r, from_clock, from_reset, depth, sync)
+    to_sink.aw <> AsyncDecoupledCrossing(from_clock, from_reset, from_source.aw, Bool(false),
+      to_clock, to_reset, Bool(false),  depth, sync)
+    to_sink.ar <> AsyncDecoupledCrossing(from_clock, from_reset, from_source.ar, Bool(false),
+      to_clock, to_reset, Bool(false), depth, sync)
+    to_sink.w  <> AsyncDecoupledCrossing(from_clock, from_reset, from_source.w, Bool(false),
+      to_clock, to_reset, Bool(false), depth, sync)
+    from_source.b <> AsyncDecoupledCrossing(to_clock, to_reset, to_sink.b, Bool(false),
+      from_clock, from_reset, Bool(false), depth, sync)
+    from_source.r <> AsyncDecoupledCrossing(to_clock, to_reset, to_sink.r, Bool(false), 
+      from_clock, from_reset, Bool(false), depth, sync)
 
     to_sink // is now to_source
   }

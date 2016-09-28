@@ -235,10 +235,12 @@ class TLFuzzRAM extends LazyModule
     ram.module.clock := clocks.io.clock_out
 
     // ... and safely cross TL2 into it
-    cross.module.io.in_clock := clock
-    cross.module.io.in_reset := reset
+    cross.module.io.in_clock  := clock
+    cross.module.io.in_reset  := reset
+    cross.module.io.in_iso    := Bool(false)
     cross.module.io.out_clock := clocks.io.clock_out
     cross.module.io.out_reset := reset
+    cross.module.io.out_iso   := Bool(false)
 
     // Push the Monitor into the right clock domain
     monitor.foreach { m =>

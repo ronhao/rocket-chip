@@ -63,8 +63,10 @@ class RegisterWriteCrossing[T <: Data](gen: T, sync: Int = 3) extends Module {
   // If the deq side is reset, at worst the master rewrites mem(0) once, deq.bits stays fixed.
   crossing.io.enq_clock := io.master_clock
   crossing.io.enq_reset := io.master_reset
+  crossing.io.enq_iso   := Bool(false)
   crossing.io.deq_clock := io.slave_clock
   crossing.io.deq_reset := io.slave_reset
+  crossing.io.deq_iso   := Bool(false)
 
   crossing.io.enq.bits := io.master_port.request.bits
   io.slave_register := crossing.io.deq.bits
@@ -113,8 +115,10 @@ class RegisterReadCrossing[T <: Data](gen: T, sync: Int = 3) extends Module {
   // If the deq side is reset, at worst the slave rewrites mem(0) once, deq.bits stays fixed.
   crossing.io.enq_clock := io.slave_clock
   crossing.io.enq_reset := io.slave_reset
+  crossing.io.enq_iso   := Bool(false)
   crossing.io.deq_clock := io.master_clock
   crossing.io.deq_reset := io.master_reset
+  crossing.io.enq_iso   := Bool(false)
 
   crossing.io.enq.bits := io.slave_register
   io.master_port.response.bits := crossing.io.deq.bits

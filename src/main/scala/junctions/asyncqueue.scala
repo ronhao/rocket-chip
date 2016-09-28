@@ -4,6 +4,38 @@ package junctions
 import Chisel._
 import uncore.util.{AsyncResetRegVec, AsyncResetReg}
 
+// Forces the output low if iso is asserted.
+
+class IsoClamp extends BlackBox {
+
+  val io = new Bundle {
+    val in = Bool(INPUT)
+    val iso = Bool(INPUT)
+    val out = Bool(OUTPUT)
+  }
+
+ // io.out := io.in & ~io.iso
+
+}
+
+object IsoClamp {
+  def apply[T <: Data](in: T, isoIn: Bool): T = {
+    val isoclamps = List.fill(in.getWidth)(Module (new IsoClamp()))
+    val inbits = Wire(UInt(width = in.getWidth))
+    inbits := in.asUInt
+    val isobits = Wire(Vec(in.getWidth, Bool()))
+
+   (isoclamps.zipWithIndex).foreach {
+     case (a, i) => { 
+       a.io.iso := isoIn
+       a.io.in  := inbits(i)
+       isobits(i) := a.io.out      
+     }
+   }
+    in.cloneType.fromBits(isobits.asUInt)
+  }
+}
+
 object GrayCounter {
   def apply(bits: Int, increment: Bool = Bool(true)): UInt = {
     val incremented = Wire(UInt(width=bits))
@@ -14,9 +46,9 @@ object GrayCounter {
 }
 
 object AsyncGrayCounter {
-  def apply(in: UInt, sync: Int): UInt = {
+  def apply(in: UInt, sync: Int, isoIn: Bool): UInt = {
     val syncv = List.fill(sync)(Module (new AsyncResetRegVec(w = in.getWidth, 0)))
-    syncv.last.io.d := in
+    syncv.last.io.d := IsoClamp(in, isoIn)
     syncv.last.io.en := Bool(true)
       (syncv.init zip syncv.tail).foreach { case (sink, source) => {
         sink.io.d := source.io.q
@@ -27,7 +59,8 @@ object AsyncGrayCounter {
   }
 }
 
-class AsyncQueueSource[T <: Data](gen: T, depth: Int, sync: Int, clockIn: Clock, resetIn: Bool)
+class AsyncQueueSource[T <: Data](gen: T, depth: Int, sync: Int,
+  clockIn: Clock, resetIn: Bool)
     extends Module(_clock = clockIn, _reset = resetIn) {
   val bits = log2Ceil(depth)
   val io = new Bundle {
@@ -37,11 +70,12 @@ class AsyncQueueSource[T <: Data](gen: T, depth: Int, sync: Int, clockIn: Clock,
     val ridx = UInt(INPUT,  width = bits+1)
     val widx = UInt(OUTPUT, width = bits+1)
     val mem  = Vec(depth, gen).asOutput
+    val iso  = Bool(INPUT)
   }
 
   val mem = Reg(Vec(depth, gen)) //This does NOT need to be asynchronously reset.
   val widx = GrayCounter(bits+1, io.enq.fire())
-  val ridx = AsyncGrayCounter(io.ridx, sync)
+  val ridx = AsyncGrayCounter(io.ridx, sync, io.iso)
   val ready = widx =/= (ridx ^ UInt(depth | depth >> 1))
 
   val index = if (depth == 1) UInt(0) else io.widx(bits-1, 0) ^ (io.widx(bits, bits) << (bits-1))
@@ -55,7 +89,8 @@ class AsyncQueueSource[T <: Data](gen: T, depth: Int, sync: Int, clockIn: Clock,
   io.mem := mem
 }
 
-class AsyncQueueSink[T <: Data](gen: T, depth: Int, sync: Int, clockIn: Clock, resetIn: Bool)
+class AsyncQueueSink[T <: Data](gen: T, depth: Int, sync: Int,
+  clockIn: Clock, resetIn: Bool)
     extends Module(_clock = clockIn, _reset = resetIn) {
   val bits = log2Ceil(depth)
   val io = new Bundle {
@@ -65,10 +100,11 @@ class AsyncQueueSink[T <: Data](gen: T, depth: Int, sync: Int, clockIn: Clock, r
     val ridx = UInt(OUTPUT, width = bits+1)
     val widx = UInt(INPUT,  width = bits+1)
     val mem  = Vec(depth, gen).asInput
+    val iso  =  Bool(INPUT)
   }
 
   val ridx = GrayCounter(bits+1, io.deq.fire())
-  val widx = AsyncGrayCounter(io.widx, sync)
+  val widx = AsyncGrayCounter(io.widx, sync, io.iso)
   val valid = ridx =/= widx
 
   // The mux is safe because timing analysis ensures ridx has reached the register
@@ -78,10 +114,11 @@ class AsyncQueueSink[T <: Data](gen: T, depth: Int, sync: Int, clockIn: Clock, r
   val index = if (depth == 1) UInt(0) else ridx(bits-1, 0) ^ (ridx(bits, bits) << (bits-1))
   // This register does not NEED to be reset, as its contents will not
   // be considered unless the asynchronously reset deq valid register is set.
-  io.deq.bits  := RegEnable(io.mem(index), valid) 
-    
-  io.deq.valid := AsyncResetReg(valid, 0)
 
+  val rbits = IsoClamp(io.mem(index), io.iso)
+ 
+  io.deq.bits  := rbits
+  io.deq.valid := AsyncResetReg(valid, 0)
   io.ridx := AsyncResetReg(ridx, 0)
 }
 
@@ -90,8 +127,10 @@ class AsyncQueue[T <: Data](gen: T, depth: Int = 8, sync: Int = 3) extends Cross
   require (depth > 0 && isPow2(depth))
 
   val io = new CrossingIO(gen)
-  val source = Module(new AsyncQueueSource(gen, depth, sync, io.enq_clock, io.enq_reset))
-  val sink   = Module(new AsyncQueueSink  (gen, depth, sync, io.deq_clock, io.deq_reset))
+  val source = Module(new AsyncQueueSource(gen, depth, sync,
+    io.enq_clock, io.enq_reset))
+  val sink   = Module(new AsyncQueueSink  (gen, depth, sync,
+    io.deq_clock, io.deq_reset))
 
   source.io.enq <> io.enq
   io.deq <> sink.io.deq
