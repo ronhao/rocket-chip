@@ -7,6 +7,7 @@ import Instructions._
 import cde.{Parameters, Field}
 import uncore.devices._
 import util._
+import ImplicitConversions._
 import junctions.AddrMap
 
 class MStatus extends Bundle {

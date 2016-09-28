@@ -9,6 +9,7 @@ import uncore.agents._
 import uncore.constants._
 import uncore.util._
 import util._
+import ImplicitConversions._
 import cde.{Parameters, Field}
 
 case class DCacheConfig(

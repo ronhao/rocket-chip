@@ -6,6 +6,7 @@ import Chisel._
 import uncore.agents._
 import uncore.constants._
 import util._
+import ImplicitConversions._
 import cde.{Parameters, Field}
 
 class PTWReq(implicit p: Parameters) extends CoreBundle()(p) {
